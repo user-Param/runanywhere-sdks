@@ -107,18 +107,48 @@ class YamlParser {
             // keeps us honest for strings containing '#'.
             std::string clean;
             bool in_sq = false, in_dq = false;
-            for (char c : line) {
-                if (!in_dq && c == '\'') {
-                    in_sq = !in_sq;
+            char last_token_char = '\0';
+            size_t last_token_pos = 0;
+            const size_t first_token_pos = line.find_first_not_of(" \t");
+            bool after_ws = true;
+            bool escape_next = false;
+            for (size_t i = 0; i < line.size(); ++i) {
+                const char c = line[i];
+                if (escape_next) {
+                    clean.push_back(c);
+                    escape_next = false;
+                    continue;
+                }
+                if (i > 0) {
+                    const char prev = line[i - 1];
+                    after_ws = prev == ' ' || prev == '\t';
+                    if (!after_ws) {
+                        last_token_char = prev;
+                        last_token_pos = i - 1;
+                    }
+                }
+                const bool can_open =
+                    last_token_char == '\0' ||
+                    (after_ws && (last_token_char == ':' ||
+                                  (last_token_char == '-' && last_token_pos == first_token_pos)));
+                if ((in_sq && c == '\'' && i + 1 < line.size() && line[i + 1] == '\'') ||
+                    (in_dq && c == '\\' && i + 1 < line.size())) {
+                    clean.push_back(c);
+                    clean.push_back(line[++i]);
+                    continue;
+                }
+                if (!in_dq && c == '"') {
+                    if (in_dq || can_open)
+                        in_dq = !in_dq;
                     clean.push_back(c);
                     continue;
                 }
-                if (!in_sq && c == '"') {
-                    in_dq = !in_dq;
+                if (in_dq && c == '\\') {
+                    escape_next = true;
                     clean.push_back(c);
                     continue;
                 }
-                if (!in_sq && !in_dq && c == '#')
+                if (!in_sq && !in_dq && c == '#' && after_ws)
                     break;
                 clean.push_back(c);
             }
