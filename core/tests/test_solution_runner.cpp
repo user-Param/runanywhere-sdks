@@ -1314,6 +1314,7 @@ TEST(yaml_apostrophe_does_not_swallow_a_trailing_comment) {
     }
 }
 
+<<<<<<< HEAD
 TEST(c_abi_yaml_comment_stripper_quoted_hash) {
     ScopedSolutionStandins standins;
 
@@ -1336,6 +1337,8 @@ TEST(c_abi_yaml_comment_stripper_quoted_hash) {
     rac_solution_cancel(h);
     rac_solution_destroy(h);
 }
+=======
+>>>>>>> origin/main
 // ---------------------------------------------------------------------------
 // 13. C ABI YAML path — raw PipelineSpec shape (top-level `operators`).
 // ---------------------------------------------------------------------------
@@ -1358,6 +1361,23 @@ TEST(c_abi_yaml_pipeline_lifecycle) {
     CHECK(rac_solution_feed(h, "tick") == RAC_SUCCESS);
     CHECK(rac_solution_close_input(h) == RAC_SUCCESS);
     rac_solution_destroy(h);
+}
+
+TEST(yaml_quoted_scalars_decode_escapes) {
+    runanywhere::v1::SolutionConfig single;
+    CHECK(rac::solutions::load_solution_from_yaml("voice_agent:\n"
+                                                  "  llm_model_id: qwen3-4b\n"
+                                                  "  system_prompt: 'Don''t use markdown'\n",
+                                                  &single) == RAC_SUCCESS);
+    CHECK(single.voice_agent().generation().system_prompt() == "Don't use markdown");
+
+    runanywhere::v1::SolutionConfig dbl;
+    CHECK(rac::solutions::load_solution_from_yaml(
+              "voice_agent:\n"
+              "  llm_model_id: qwen3-4b\n"
+              "  system_prompt: \"say \\\"hi\\\"\\nthen caf\\u00e9 \\\\ \\q\"\n",
+              &dbl) == RAC_SUCCESS);
+    CHECK(dbl.voice_agent().generation().system_prompt() == "say \"hi\"\nthen caf\xc3\xa9 \\ \\q");
 }
 
 // ---------------------------------------------------------------------------
@@ -1473,9 +1493,13 @@ int main() {
     run_test_voice_agent_barge_in_params_reach_the_vad_operator();
     run_test_c_abi_yaml_solution_lifecycle();
     run_test_yaml_apostrophe_does_not_swallow_a_trailing_comment();
+<<<<<<< HEAD
     run_test_c_abi_yaml_comment_stripper_quoted_hash();
+=======
+>>>>>>> origin/main
     run_test_c_abi_yaml_pipeline_lifecycle();
     run_test_retrieve_without_session_handle_fails_honestly();
+    run_test_yaml_quoted_scalars_decode_escapes();
     run_test_null_handle_paths();
 
     std::fprintf(stderr, "\n%d passed / %d failed\n", g_passed, g_failed);
