@@ -107,7 +107,13 @@ class YamlParser {
             // keeps us honest for strings containing '#'.
             std::string clean;
             bool in_sq = false, in_dq = false;
+            bool escape_next = false;
             for (char c : line) {
+                if (escape_next) {
+                    clean.push_back(c);
+                    escape_next = false;
+                    continue;
+                }
                 if (!in_dq && c == '\'') {
                     in_sq = !in_sq;
                     clean.push_back(c);
@@ -115,6 +121,11 @@ class YamlParser {
                 }
                 if (!in_sq && c == '"') {
                     in_dq = !in_dq;
+                    clean.push_back(c);
+                    continue;
+                }
+                if (in_dq && c == '\\') {
+                    escape_next = true;
                     clean.push_back(c);
                     continue;
                 }
@@ -178,11 +189,49 @@ class YamlParser {
 
     static std::string unquote(const std::string& s) {
         if (s.size() >= 2 &&
-            ((s.front() == '"' && s.back() == '"') || (s.front() == '\'' && s.back() == '\''))) {
-            return s.substr(1, s.size() - 2);
+            ((s.front() == '"' && s.back() == '"') || (s.front() == '\x27' && s.back() == '\x27'))) {
+            char quote = s.front();
+            std::string content = s.substr(1, s.size() - 2);
+            if (quote == '\x27') {
+                // Single-quoted: only '' -> ' is special
+                std::string out;
+                for (size_t i = 0; i < content.size(); ++i) {
+                    if (content[i] == '\x27' && i + 1 < content.size() && content[i + 1] == '\x27' ) {
+                        out.push_back('\x27');
+                        ++i;
+                    } else {
+                        out.push_back(content[i]);
+                    }
+                }
+                return out;
+            } else {
+                // Double-quoted: handle YAML escape sequences
+                std::string out;
+                for (size_t i = 0; i < content.size(); ++i) {
+                    if (content[i] == '\\' && i + 1 < content.size()) {
+                        char next = content[i + 1];
+                        switch (next) {
+                            case '"':  out.push_back('"'); break;
+                            case '\\': out.push_back('\\'); break;
+                            case '/':  out.push_back('/'); break;
+                            case 'n':  out.push_back('\n'); break;
+                            case 't':  out.push_back('\t'); break;
+                            case 'r':  out.push_back('\r'); break;
+                            case 'b':  out.push_back('\b'); break;
+                            case 'f':  out.push_back('\f'); break;
+                            default:   out.push_back(next); break;
+                        }
+                        ++i;
+                    } else {
+                        out.push_back(content[i]);
+                    }
+                }
+                return out;
+            }
         }
         return s;
     }
+
 
     /// Parse the block starting at `idx` whose first line has indent
     /// >= base_indent. Advances idx past the consumed region.
